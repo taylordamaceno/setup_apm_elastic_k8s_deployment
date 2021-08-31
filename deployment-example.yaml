@@ -1,0 +1,60 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-deployment
+  namespace: ns-example 
+  labels:
+    name: example 
+spec:
+  replicas: 2 
+  selector:
+    matchLabels:
+      app: example
+  template:
+    metadata:
+      labels:
+        app: example
+    spec:
+      containers:
+      - name: example-deployment
+        image: example:tag
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          limits:
+            memory: "512Mi"
+          requests:
+            memory: "256Mi" 
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+         - name: workdir
+           mountPath: /opt/apm  
+        lifecycle:  
+          postStart:
+            exec:      
+              command: [" nohup java -jar /opt/apm/apm-agent-attach-cli-1.24.0.jar --include-main app /app.jar --include-vmargs elastic.apm.agent.attach=true --continuous --config service_name=example --config service=Delastic.apm.application_packages=br.com.example --config server_url=http://apm-server-apm-server.monitoring.svc.cluster.local:8200 & "]
+        env:
+          - name: server_port
+            value: "8080"
+          ###
+      initContainers:
+      - name: install
+        image: busybox:1.31 
+        command:
+        - wget
+        - "-O"  
+        - "/opt/apm/apm-agent-attach-cli-1.24.0.jar"
+        - https://repo1.maven.org/maven2/co/elastic/apm/apm-agent-attach-cli/1.24.0/apm-agent-attach-cli-1.24.0.jar 
+        volumeMounts:
+        - name: workdir
+          mountPath: "/opt/apm"
+      dnsPolicy: ClusterFirst 
+      volumes:
+      - name: workdir
+        emptyDir: {}
